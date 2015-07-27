@@ -1,10 +1,4 @@
-import ohnosequences.sbt._
-import sbtrelease._
-import ReleaseStateTransformations._
-import ReleasePlugin._
-import ReleaseKeys._
-import AssemblyKeys._
-import ohnosequences.sbt.nice.AssemblySettings
+fatArtifactSettings
 
 publishMavenStyle := false
 
@@ -13,8 +7,6 @@ isPrivate := true
 bucketSuffix := "frutero.org"
 
 //bucketSuffix := "$bucketSuffix$"
-
-AssemblySettings.fatArtifactSettings
 
 mergeStrategy in assembly <<= (mergeStrategy in assembly) { (old) => {
   case "avsl.conf" => MergeStrategy.first

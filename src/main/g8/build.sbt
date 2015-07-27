@@ -5,7 +5,7 @@ name := "$name$"
 organization := "$organization$"
 
 libraryDependencies ++= Seq(
-  "ohnosequences" % "compota_2.10" % "0.10.0-RC2"
+  "ohnosequences" %% "compota" % "0.10.0-RC2"
 )
 
 resolvers ++= Seq(

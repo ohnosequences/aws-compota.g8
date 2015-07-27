@@ -1,4 +1,11 @@
 sourceGenerators in Compile += task[Seq[File]] {
+  def artifactPrepare(s: String): String = {
+    s.split("\\W").reduce(_ + "_" + _)
+  }
+  def stringOptionPrinter(option: Option[String]): String = option match {
+    case None => "None"
+    case Some(s) => "Some(\"" + s + "\")"
+  }
   // Patterns:
   // mvn: "[organisation]/[module]_[scalaVersion]/[revision]/[artifact]-[revision]-[classifier].[ext]"
   // ivy: "[organisation]/[module]_[scalaVersion]/[revision]/[type]s/[artifact]-[classifier].[ext]"
