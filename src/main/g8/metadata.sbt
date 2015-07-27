@@ -1,9 +1,8 @@
-//a statika party is here
 sourceGenerators in Compile += task[Seq[File]] {
   // Patterns:
   // mvn: "[organisation]/[module]_[scalaVersion]/[revision]/[artifact]-[revision]-[classifier].[ext]"
   // ivy: "[organisation]/[module]_[scalaVersion]/[revision]/[type]s/[artifact]-[classifier].[ext]"
-  val fatUrl = {
+  val fatJarUrl = {
     val isMvn = publishMavenStyle.value
     val scalaV = "_"+scalaBinaryVersion.value
     val module = moduleName.value + scalaV
@@ -20,15 +19,21 @@ sourceGenerators in Compile += task[Seq[File]] {
     ).mkString("/")
   }
   val text = """
-               |package generated.metadata
+               |package ohnosequences.compota.generated
+               |import ohnosequences.compota.aws.deployment.Metadata
                |
-               |object testCompota extends ohnosequences.compota.aws.deployment.Metadata { //$name$
-               |  val artifact: String = "$artifact$"
-               |  val jarUrl: String = "$jarUrl$"
+               |object metadata {
+               |  val metadata: Metadata = Metadata(
+               |    artifact = "$artifact$",
+               |    jarUrl = "$jarUrl$",
+               |    testJarUrl = None,
+               |    mainClass = $mainClass$
+               |  )
                |}
-               |""".stripMargin.
-    replace("$artifact$", name.value.toLowerCase).
-    replace("$jarUrl$", fatUrl)
+               |""".stripMargin
+    .replace("$artifact$", artifactPrepare(name.value + version.value))
+    .replace("$jarUrl$", fatJarUrl)
+    .replace("$mainClass$", stringOptionPrinter(None))
   val file = (sourceManaged in Compile).value / "metadata.scala"
   IO.write(file, text)
   Seq(file)
