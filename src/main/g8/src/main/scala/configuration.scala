@@ -1,37 +1,75 @@
-package testCompota
-//package $name$
+package $name$
 
 import ohnosequences.awstools.s3.ObjectAddress
+import ohnosequences.compota.MapInstructions
 import ohnosequences.compota.aws._
-import ohnosequences.compota.local.LocalCompota
-import ohnosequences.compota.monoid.stringMonoid
-import ohnosequences.compota.{Instructions, Compota, Nispero, MapInstructions}
-import ohnosequences.compota.logging.Logger
-import ohnosequences.compota.queues.local.{BlockingMonoidQueue, BlockingQueue}
+import ohnosequences.compota.aws.deployment.AnyMetadata
+import ohnosequences.compota.aws.queues.{S3InMemoryReducible, DynamoDBQueue}
+import ohnosequences.compota.environment.Env
+import ohnosequences.compota.monoid.intMonoid
+import ohnosequences.compota.serialization.{stringSerializer, intSerializer}
 
-import scala.util.Success
+import scala.concurrent.duration._
+import scala.util.{Success, Try}
 
-object q1 extends BlockingQueue[Int]("q1", 10)
-object q2 extends BlockingMonoidQueue[String]("q2", 10, stringMonoid)
+import com.amazonaws.auth.AWSCredentialsProvider
 
-object instr extends MapInstructions[Int, String] {
-  override def apply(logger: Logger, context: Int, input: Int) = Success((1000 / input).toString)
+object testInputQueue extends DynamoDBQueue[String](
+  name = "testInputQueue",
+  serializer = stringSerializer
+)
 
-  override def prepare(logger: Logger) = Success(0)
-
-  override type Context = Int
+object testOutputQueue extends DynamoDBQueue[Int](
+  name = "testOutputQueue",
+  serializer = intSerializer
+) with S3InMemoryReducible {
+  override val destination: Option[ObjectAddress] = testCompotaConfiguration.resultsDestination(testOutputQueue)
+  override val monoid = intMonoid
 }
 
-object configuration extends AwsCompotaConfigurationAux(
-	generated.metadata.testCompota)
-object nisperoConfiguration extends AwsNisperoConfigurationAux("printer", configuration)
+object testInstructions extends MapInstructions[String, Int] {
+  override type Context = Unit
+  override def prepare(env: Env): Try[Context] = Success(())
+  override def apply(env: Env, context: Context, input: String): Try[Int] = {
+    Success(input.length)
+  }
+}
 
-object nispero1 extends AwsNispero("printer", q1, q2, instr, nisperoConfiguration)
+object testCompotaConfiguration extends AwsCompotaConfiguration {
+  override def localAwsCredentialsProvider: AWSCredentialsProvider = $credentialsProvider$
+  override def metadata: AnyMetadata = ohnosequences.compota.generated.metadata.metadata
+  override def notificationEmail: String = "$email$"
+  override def keyName: String = "$sshKeyPair$"
+  override def timeout: Duration = Duration(1, HOURS)
+}
+
+object testNisperoConfiguration extends AwsNisperoConfiguration {
+  override def name: String = "test"
+  override def compotaConfiguration: AwsCompotaConfiguration = testCompotaConfiguration
+}
+
+object testNispero extends AwsNispero (
+  inputQueue = testInputQueue,
+  outputQueue = testOutputQueue,
+  instructions = testInstructions,
+  configuration = testNisperoConfiguration
+)
 
 
+object testCompota extends AwsCompota[Unit] (
+  nisperos = List(testNispero),
+  configuration = testCompotaConfiguration
+) {
 
-object TestCompota extends AwsCompota(List(nispero1), List(q2), configuration) {
-  override def addTasks(): Unit = {
-    q1.getWriter.foreach{_.write("1", List(123, 0))}
+  override def prepareUnDeployActions(env: AwsEnvironment): Try[Unit] = {
+    Success(())
+  }
+
+  override def addTasks(env: AwsEnvironment): Try[Unit] = {
+    testInputQueue.create(env.createDynamoDBContext).flatMap { queueOp =>
+      queueOp.writer.flatMap { writer =>
+        writer.writeMessages(".", List("test", "longTest", "tst"))
+      }
+    }
   }
 }
